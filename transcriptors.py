@@ -2,19 +2,11 @@
     Transcriptor module
 """
 import re
+from assimilators import assimilate
 import string
 
 
-def prepare_word(word):
-    for char in ('"', "'"):
-        word = word.replace(char, '’')
-
-    for char in string.punctuation:
-        word = word.replace(char, '')
-    return word
-
-
-class Charsets:
+class Characters:
 
     accent_char = '\N{COMBINING ACUTE ACCENT}'
     breve_char = '\N{COMBINING INVERTED BREVE}'
@@ -62,41 +54,31 @@ class Charsets:
     }
 
 
-class Transcriptor(Charsets):
-    """
-    Transcriptor class
-    """
+class FormatterWord(Characters):
 
     def __init__(self, word):
-        self.original_word = word
-        self.word = prepare_word(word)
+        self.word = word
         self.accent_index = False
-        self.transcription = ''
-        self.chars = []
-        self.clearly_chars = []
-        self.syllables = []
-        self.grouped_syllables = []
-        self.groups = []
 
-        self.transcript()
+        self.format()
 
-    def transcript(self):
+    def format(self):
+        self.replace_quotes_apostrophe()
+        self.clear_punctuation_chars()
         self.get_accent_index()
         self.replace_soft_sings()
         self.replace_complex_vowels()
         self.replace_complex_consonants()
         self.replace_double_consonants()
         self.replace_asyllabics_chars()
-        self.remove_apostrophe()
 
-        self.split_chars()
-        self.make_mask_word()
-        self.split_syllable()
+    def replace_quotes_apostrophe(self):
+        for char in ('"', "'"):
+            self.word = self.word.replace(char, '’')
 
-        self.replace_unaccented_vowels()
-
-        self.make_groups_by_rules()
-        self.assort_characters_using_mask()
+    def clear_punctuation_chars(self):
+        for char in string.punctuation:
+            self.word = self.word.replace(char, '')
 
     def get_accent_index(self):
         """
@@ -107,37 +89,34 @@ class Transcriptor(Charsets):
             self.accent_index = accent_index - 1
 
     def replace_soft_sings(self):
-        """
-        Replace soft sing to singe quotes
-        """
         self.word = self.word.replace("ь", "'")
 
     def replace_complex_vowels(self):
         """
         Replace complex vowels to equivalent characters
         """
-        transcription = ''
+        word = ''
         for index, char in enumerate(self.word):
             if char not in self.complex_vowels:
-                transcription += char
+                word += char
                 continue
             replace_char = self.complex_vowels.get(char)
-            transcription += replace_char[1] if index - 1 >= 0 and self.word[index - 1] in self.all_consonants else replace_char[0]
-        self.transcription = transcription
+            word += replace_char[1] if index - 1 >= 0 and self.word[index - 1] in self.all_consonants else replace_char[0]
+        self.word = word
 
     def replace_complex_consonants(self):
         """
         Replace complex consonants to equivalent charsets
         """
         for complex_consonant, charsets in self.complex_consonants.items():
-            self.transcription = self.transcription.replace(complex_consonant, charsets)
+            self.word = self.word.replace(complex_consonant, charsets)
 
     def replace_double_consonants(self):
         """
         Replace double consonants to single consonants with colon
         """
         pattern = re.compile(r"(.)\1(\')?")
-        match = re.search(pattern, self.transcription)
+        match = re.search(pattern, self.word)
         if not match:
             return
         found_substring = match.group(0)
@@ -146,24 +125,83 @@ class Transcriptor(Charsets):
         if char not in self.all_consonants:
             return
         new_substring = '{}\':'.format(char) if apostrophe else '{}:'.format(char)
-        self.transcription = self.transcription.replace(found_substring, new_substring)
+        self.word = self.word.replace(found_substring, new_substring)
 
     def replace_asyllabics_chars(self):
         """
         Find and replace asyllabic characters
         """
-        transcription = self.transcription
-        len_transcription = len(transcription) - 1
+        word = self.word
+        len_word = len(word) - 1
         for char, replace_char in self.asyllabics.items():
-            matches = re.finditer(char, transcription)
+            matches = re.finditer(char, word)
             for match in matches:
-                if match.start() == 0 and transcription[1] in self.all_consonants:
-                    transcription = replace_char + transcription[1:]
-                if match.start() == len_transcription and transcription[-2] in self.all_vowels:
-                    transcription = transcription[:-1] + replace_char
-                if 0 < match.start() < len_transcription and transcription[match.start() - 1] in self.all_vowels and transcription[match.start() + 1] in self.all_consonants:
-                    transcription = transcription[:match.start()] + replace_char + transcription[match.start()+1:]
-        self.transcription = transcription
+                if match.start() == 0 and word[1] in self.all_consonants:
+                    word = replace_char + word[1:]
+                if match.start() == len_word and word[-2] in self.all_vowels:
+                    word = word[:-1] + replace_char
+                if 0 < match.start() < len_word and word[match.start() - 1] in self.all_vowels and word[match.start() + 1] in self.all_consonants:
+                    word = word[:match.start()] + replace_char + word[match.start()+1:]
+        self.word = word
+
+
+class TranscriptionWord:
+    """
+    Transcriptor class
+    """
+
+    def __init__(self, word, assimilate=False):
+        self.original_word = word
+        self.assimilate = assimilate
+
+        formatter_word = FormatterWord(word)
+
+        self.word = formatter_word.word
+        self.accent_index = formatter_word.accent_index
+
+        self.transcriptions = []
+
+        self.transcript()
+
+    def transcript(self):
+
+        if self.assimilate:
+            words = assimilate(self.word)
+        else:
+            words = self.word,
+
+        for word in words:
+            transcriptor = Transcriptor(word, self.accent_index)
+            self.transcriptions.append(transcriptor)
+
+    def get_transcription(self):
+        return [t.get_string_transcription() for t in self.transcriptions]
+
+
+class Transcriptor(Characters):
+
+    def __init__(self, word, accent_index):
+        self.word = word
+        self.accent_index = accent_index
+        self.transcription = word
+        self.chars = []
+        self.clearly_chars = []
+        self.syllables = []
+        self.grouped_syllables = []
+        self.groups = []
+
+        self.transcript()
+
+    def transcript(self):
+        self.remove_apostrophe()
+        self.split_chars()
+        self.make_mask_word()
+        self.split_syllable()
+
+        self.replace_unaccented_vowels()
+
+        self.make_groups_by_rules()
+        self.assort_characters_using_mask()
 
     def remove_apostrophe(self):
         """
@@ -334,7 +372,7 @@ class Transcriptor(Charsets):
             elif piece in {'131', '121', '231', '133', '233'} and index != 0:
                 groups[-1].append(piece[0])
                 next_syl.extend(list(piece[1:]))
-            elif piece in {'1331', '2331', '1231', '1321', '3331'} and index != 0:
+            elif piece in {'1331', '2331', '1231', '1321', '3331', '3333'} and index != 0:
                 groups[-1].append(piece[0])
                 next_syl.extend(list(piece[1:]))
             elif piece == self.ASYLLABIC_CHAR:
