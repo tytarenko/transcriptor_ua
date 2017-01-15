@@ -518,7 +518,7 @@ class TranscriptionWord:
             transcriptor.transcript()
             self.transcriptions.append(transcriptor)
 
-    def get_transcription(self):
+    def get_transcriptions(self):
         return [t.get_string_transcription() for t in self.transcriptions]
 
 
