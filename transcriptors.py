@@ -2,9 +2,23 @@
     Transcriptor module
 """
 import re
+import string
+
+
+def prepare_word(word):
+    for char in ('"', "'"):
+        word = word.replace(char, '’')
+
+    for char in string.punctuation:
+        word = word.replace(char, '')
+    return word
 
 
 class Charsets:
+
+    accent_char = '\N{COMBINING ACUTE ACCENT}'
+    breve_char = '\N{COMBINING INVERTED BREVE}'
+
     VOWEL = '0'
     C_SONORANT = '1'
     C_VOICING = '2'
@@ -17,6 +31,7 @@ class Charsets:
     }
 
     all_vowels = ('а', 'е', 'и', 'і', 'о', 'у', 'є', 'ю', 'я', 'ї',)
+    simple_vowels = ('а', 'е', 'и', 'і', 'о', 'у',)
     all_consonants = ('б', 'в', 'г', 'ґ', 'д', 'ж', 'з', 'к', 'л', 'м', 'н', 'п', 'р', 'с', 'т', 'ф', 'х', 'ц', 'ч', 'ш', 'щ', )
 
     complex_vowels = {
@@ -41,7 +56,9 @@ class Charsets:
     unaccented_vowels = {
         'е': u"е\u1D58",
         'и': u"и\u1D49",
-        'о': u"о\u02B8"
+        'о': u"о\u02B8",
+        # 'у': u"у\u1D52",
+        # 'i': u"i\u1D58",
     }
 
 
@@ -52,7 +69,7 @@ class Transcriptor(Charsets):
 
     def __init__(self, word):
         self.original_word = word
-        self.word = word
+        self.word = prepare_word(word)
         self.accent_index = False
         self.transcription = ''
         self.chars = []
@@ -85,10 +102,9 @@ class Transcriptor(Charsets):
         """
         Find position of accent and remove it
         """
-        accent_index = self.word.find('\N{COMBINING ACUTE ACCENT}')
+        accent_index = self.word.find(self.accent_char)
         if accent_index > -1:
             self.accent_index = accent_index - 1
-            self.word = self.word.replace('\N{COMBINING ACUTE ACCENT}', '')
 
     def replace_soft_sings(self):
         """
@@ -162,14 +178,14 @@ class Transcriptor(Charsets):
         chars = []
         iter_tr = iter(self.transcription)
         for char in iter_tr:
-            if char in {"'", ':'}:
+            if char in {"'", ':', self.accent_char}:
                 chars[-1] += char
-            elif char == '\N{COMBINING INVERTED BREVE}':
+            elif char == self.breve_char:
                 chars[-1] += char + next(iter_tr)
             else:
                 chars.append(char)
         self.chars = chars
-        self.clearly_chars = list(map(lambda ch: ch.replace(':', '').replace("'", ''), self.chars))
+        self.clearly_chars = list(map(lambda ch: ch.replace(':', '').replace("'", '').replace(self.accent_char, ''), self.chars))
 
     def make_mask_word(self):
         """
@@ -214,6 +230,10 @@ class Transcriptor(Charsets):
         return char
 
     def split_syllable(self):
+        """
+
+        :return:
+        """
         syllables = []
         new_syllable = ''
         for char in self.syllables:
@@ -229,12 +249,23 @@ class Transcriptor(Charsets):
         self.syllables = syllables
 
     def replace_unaccented_vowels(self):
+        """
+
+        :return:
+        """
         if self.accent_index is False:
             return
         replacing_chars = []
         for index, char in enumerate(self.chars):
             if char in self.unaccented_vowels and index != self.accent_index:
-                replacing_chars.append(self.unaccented_vowels.get(char))
+                # Голосний [о], тільки в одному випадку у вимові виближається до [у], коли в наступному складі  [у] стоїть під наголосом [коужух], [зоузул'а].
+                if char == 'о':
+                    if self.chars[self.accent_index] == 'у'+self.accent_char:
+                        replacing_chars.append(self.unaccented_vowels.get(char))
+                    else:
+                        replacing_chars.append(char)
+                else:
+                    replacing_chars.append(self.unaccented_vowels.get(char))
             else:
                 replacing_chars.append(char)
         self.chars = replacing_chars
@@ -256,17 +287,25 @@ class Transcriptor(Charsets):
         grouped_syllables = []
         for group in self.groups:
             index = len(group)
-            grouped_syllables.append(''.join(chars[:index]))
+            grouped_syllables.append(chars[:index])
             chars = chars[index:]
         self.grouped_syllables = grouped_syllables
 
     def assort_for_one_syllable_word(self):
+        """
+
+        :return:
+        """
         groups = []
         for chars in self.syllables:
             groups.extend(list(chars))
         self.groups = [groups]
 
     def assort_for_multiple_syllable_word(self):
+        """
+
+        :return:
+        """
         groups = []
         next_syl = []
         len_syllables = len(self.syllables)
@@ -314,4 +353,4 @@ class Transcriptor(Charsets):
         self.groups = groups
 
     def get_string_transcription(self):
-        return '[{}]'.format('|'.join(self.grouped_syllables))
+        return '[{}]'.format('|'.join(map(lambda l: ''.join(l), self.grouped_syllables)))
