@@ -144,40 +144,6 @@ class FormatterWord(Characters):
                     word = word[:match.start()] + replace_char + word[match.start()+1:]
         self.word = word
 
-
-class TranscriptionWord:
-    """
-    Transcriptor class
-    """
-
-    def __init__(self, word, assimilate=False):
-        self.original_word = word
-        self.assimilate = assimilate
-
-        formatter_word = FormatterWord(word)
-
-        self.word = formatter_word.word
-        self.accent_index = formatter_word.accent_index
-
-        self.transcriptions = []
-
-        self.transcript()
-
-    def transcript(self):
-
-        if self.assimilate:
-            words = assimilate(self.word)
-        else:
-            words = self.word,
-
-        for word in words:
-            transcriptor = Transcriptor(word, self.accent_index)
-            self.transcriptions.append(transcriptor)
-
-    def get_transcription(self):
-        return [t.get_string_transcription() for t in self.transcriptions]
-
-
 class Transcriptor(Characters):
 
     def __init__(self, word, accent_index):
@@ -392,3 +358,36 @@ class Transcriptor(Characters):
 
     def get_string_transcription(self):
         return '[{}]'.format('|'.join(map(lambda l: ''.join(l), self.grouped_syllables)))
+
+
+class TranscriptionWord:
+    """
+    TranscriptionWord class
+    """
+
+    def __init__(self, word, assimilated=False):
+        self.original_word = word
+        self.assimilated = assimilated
+
+        formatter_word = FormatterWord(word)
+
+        self.word = formatter_word.word
+        self.accent_index = formatter_word.accent_index
+
+        self.transcriptions = []
+
+        self.transcript()
+
+    def transcript(self):
+
+        if self.assimilated:
+            words = assimilate(self.word)
+        else:
+            words = self.word,
+
+        for word in words:
+            transcriptor = Transcriptor(word, self.accent_index)
+            self.transcriptions.append(transcriptor)
+
+    def get_transcription(self):
+        return [t.get_string_transcription() for t in self.transcriptions]
