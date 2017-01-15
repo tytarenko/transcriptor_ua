@@ -144,6 +144,7 @@ class FormatterWord(Characters):
                     word = word[:match.start()] + replace_char + word[match.start()+1:]
         self.word = word
 
+
 class Transcriptor(Characters):
 
     def __init__(self, word, accent_index):
