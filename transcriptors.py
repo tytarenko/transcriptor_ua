@@ -189,7 +189,6 @@ class FormatterWord(Characters):
         self.accent_index = False
 
     def format(self):
-        self.replace_quotes_apostrophe()
         self.clear_punctuation_chars()
         self.get_accent_index()
         self.replace_soft_sings()
@@ -198,9 +197,6 @@ class FormatterWord(Characters):
         self.replace_double_consonants()
         self.replace_asyllabics_chars()
 
-    def replace_quotes_apostrophe(self):
-        for char in ('"', "'"):
-            self.word = self.word.replace(char, '’')
 
     def clear_punctuation_chars(self):
         for char in string.punctuation:
@@ -491,7 +487,7 @@ class Transcriptor(Characters):
         return '[{}]'.format('|'.join(map(lambda l: ''.join(l), self.grouped_syllables)))
 
 
-class TranscriptionWord:
+class TranscriptionWord(Characters):
     """
     TranscriptionWord class
     """
@@ -499,12 +495,18 @@ class TranscriptionWord:
     version = '0.1'
 
     def __init__(self, word, assimilated=False):
+        word = self.replace_quotes_apostrophe(word)
         self.original_word = word
         self.assimilated = assimilated
 
         self.word, self.accent_index = formatted_word(word)
 
         self.transcriptions = []
+
+    def replace_quotes_apostrophe(self, word):
+        word = word.replace('"', '’')
+        word = word.replace("'", self.accent_char)
+        return word
 
     def transcript(self):
 
